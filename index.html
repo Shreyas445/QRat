@@ -3,15 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Student QR</title>
+<title>Student QR Collection</title>
 
-<!-- QR Generator -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-<!-- Camera QR -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-<!-- Image QR Decoder -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
 <style>
@@ -54,7 +51,7 @@ body {
   font-size: 20px;
 }
 
-input {
+input[type="text"] {
   width: 100%;
   padding: 12px;
   border-radius: 10px;
@@ -72,25 +69,10 @@ button {
   cursor: pointer;
 }
 
-.primary {
-  background: #3a6cff;
-  color: white;
-}
-
-.secondary {
-  background: #2a2f45;
-  color: white;
-}
-
-.tirnery {
-  background: #5c4bde;
-  color: white;
-}
-
-.danger {
-  background: #ff5c5c;
-  color: white;
-}
+.primary { background: #3a6cff; color: white; }
+.secondary { background: #2a2f45; color: white; }
+.tirnery { background: #5c4bde; color: white; }
+.danger { background: #ff5c5c; color: white; }
 
 .divider {
   text-align: center;
@@ -127,6 +109,51 @@ button {
   font-size: 13px;
   color: #b8c0ff;
 }
+
+/* New Styles for List and Checkbox */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  background: #1a2438;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.list-info {
+  flex: 1;
+  cursor: pointer;
+}
+
+.list-name {
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.list-id {
+  font-size: 12px;
+  color: #b8c0ff;
+  margin-top: 4px;
+}
+
+.scroll-box {
+  max-height: 280px;
+  overflow-y: auto;
+}
 </style>
 </head>
 
@@ -147,19 +174,32 @@ function today() {
   return new Date().toISOString().split("T")[0];
 }
 
-/* ---------- INIT ---------- */
-const saved = localStorage.getItem("studentNumber");
-saved ? showQR(saved) : showRegister();
+/* ---------- LOCAL STORAGE HELPERS ---------- */
+function getStudents() {
+  const data = localStorage.getItem("studentsData");
+  return data ? JSON.parse(data) : [];
+}
 
-/* ---------- REGISTER PAGE (FIXED UI) ---------- */
+function saveStudents(arr) {
+  localStorage.setItem("studentsData", JSON.stringify(arr));
+}
+
+/* ---------- INIT ---------- */
+const savedStudents = getStudents();
+savedStudents.length > 0 ? showCollection() : showRegister();
+
+/* ---------- REGISTER PAGE ---------- */
 function showRegister() {
   stopCamera();
   pendingStudent = null;
 
   app.innerHTML = `
-    <div class="header">Register</div>
+    <div class="header">
+        Register New
+        ${getStudents().length > 0 ? `<span class="close" style="float:right" onclick="showCollection()">✕</span>` : ''}
+    </div>
 
-    <input id="manualInput" placeholder="Enter student number">
+    <input type="text" id="manualInput" placeholder="Enter student number">
 
     <div class="divider">OR</div>
 
@@ -182,21 +222,90 @@ function showPreview(studentNo) {
       <span class="close" style="float:right" onclick="showRegister()">✕</span>
     </div>
 
-    <div class="center">
+    <div class="center" style="margin-bottom: 16px;">
       Student Number<br><b>${studentNo}</b>
     </div>
 
+    <div class="checkbox-row">
+      <input type="checkbox" id="saveCheck" onchange="toggleNameInput()">
+      <label for="saveCheck">Save to collection</label>
+    </div>
+
+    <input type="text" id="studentName" placeholder="Enter student name" style="display: none;">
+
     <div style="margin-top:16px">
-      <button class="primary" onclick="register()">Register</button>
+      <button class="primary" onclick="processRegistration()">Confirm & Show QR</button>
       <button class="secondary" style="margin-top:8px" onclick="showRegister()">Cancel</button>
     </div>
   `;
 }
 
-/* ---------- REGISTER ---------- */
-function register() {
-  localStorage.setItem("studentNumber", pendingStudent);
+function toggleNameInput() {
+  const isChecked = document.getElementById("saveCheck").checked;
+  document.getElementById("studentName").style.display = isChecked ? "block" : "none";
+}
+
+/* ---------- REGISTRATION LOGIC ---------- */
+function processRegistration() {
+  const isChecked = document.getElementById("saveCheck").checked;
+  
+  if (isChecked) {
+    const nameVal = document.getElementById("studentName").value.trim();
+    if (!nameVal) {
+      alert("Please enter a student name to save to the collection.");
+      return;
+    }
+    
+    const students = getStudents();
+    // Avoid exact duplicates
+    if (!students.some(s => s.id === pendingStudent)) {
+        students.push({ name: nameVal, id: pendingStudent });
+        saveStudents(students);
+    }
+  }
+
   showQR(pendingStudent);
+}
+
+/* ---------- COLLECTION PAGE (Replaces Unregister Page) ---------- */
+function showCollection() {
+  stopCamera();
+  const students = getStudents();
+
+  if (students.length === 0) {
+    showRegister();
+    return;
+  }
+
+  let listHTML = students.map((s, index) => `
+    <div class="list-item">
+      <div class="list-info" onclick="showQR('${s.id}')">
+        <div class="list-name">${s.name}</div>
+        <div class="list-id">${s.id}</div>
+      </div>
+      <button class="danger" style="width: auto; padding: 8px 14px;" onclick="deleteStudent(${index})">Delete</button>
+    </div>
+  `).join("");
+
+  app.innerHTML = `
+    <div class="header">
+      Saved Students
+      <span class="close" style="float:right; font-weight:bold;" onclick="showRegister()">+ Add</span>
+    </div>
+    
+    <div class="scroll-box">
+      ${listHTML}
+    </div>
+  `;
+}
+
+function deleteStudent(index) {
+  if (confirm("Remove this student from your collection?")) {
+    const students = getStudents();
+    students.splice(index, 1);
+    saveStudents(students);
+    showCollection();
+  }
 }
 
 /* ---------- QR DISPLAY ---------- */
@@ -205,8 +314,8 @@ function showQR(studentNo) {
 
   app.innerHTML = `
     <div class="header">
-      QRCode
-      <span class="close" style="float:right" onclick="confirmUnregister()">✕</span>
+      Generated QR
+      <span class="close" style="float:right" onclick="backToMain()">✕</span>
     </div>
 
     <div class="qr-box"><div id="qrcode"></div></div>
@@ -220,24 +329,13 @@ function showQR(studentNo) {
   });
 }
 
-/* ---------- UNREGISTER ---------- */
-function confirmUnregister() {
-  app.innerHTML = `
-    <div class="header">Unregister</div>
-
-    <div class="center">Do you want to unregister your QR?</div>
-
-    <div style="margin-top:16px">
-      <button class="danger" onclick="unregister()">Unregister</button>
-      <button class="secondary" style="margin-top:8px"
-        onclick="showQR(localStorage.getItem('studentNumber'))">Cancel</button>
-    </div>
-  `;
-}
-
-function unregister() {
-  localStorage.removeItem("studentNumber");
-  showRegister();
+function backToMain() {
+    const students = getStudents();
+    if (students.length > 0) {
+        showCollection();
+    } else {
+        showRegister();
+    }
 }
 
 /* ---------- CAMERA ---------- */
@@ -262,10 +360,10 @@ function openCamera() {
         showPreview(txt.split("/")[0]);
       }
     );
-  }).catch(() => alert("Camera permission denied"));
+  }).catch(() => alert("Camera permission denied."));
 }
 
-/* ---------- FILE ---------- */
+/* ---------- FILE SCANNER ---------- */
 function openFile() {
   const input = document.createElement("input");
   input.type = "file";
@@ -286,13 +384,13 @@ function scanImage(file) {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const qr = jsQR(data.data, canvas.width, canvas.height);
 
-    if (!qr) return alert("QR not detected");
+    if (!qr) return alert("QR not detected in image.");
     showPreview(qr.data.split("/")[0]);
   };
   img.src = URL.createObjectURL(file);
 }
 
-/* ---------- MANUAL ---------- */
+/* ---------- MANUAL INPUT ---------- */
 function manualPreview() {
   const v = document.getElementById("manualInput").value.trim();
   if (!v) return alert("Enter student number");
