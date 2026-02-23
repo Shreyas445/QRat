@@ -1,104 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Student QR</title>
 
-<!-- QR GENERATE -->
+<!-- QR Generator -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-<!-- QR SCAN -->
+<!-- Camera QR -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<!-- Image QR Decoder -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
 <style>
 * {
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 body {
-    margin: 0;
-    height: 100vh;
-    background: #0b1220;
-    font-family: -apple-system, BlinkMacSystemFont, system-ui;
+  margin: 0;
+  height: 100vh;
+  background: #0b1220;
+  font-family: system-ui;
 }
 
 .overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(8,12,28,0.65);
-    backdrop-filter: blur(12px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .modal {
-    width: 92%;
-    max-width: 360px;
-    background: #0e1626;
-    border-radius: 12px;
-    padding: 14px;
-    color: white;
+  width: 92%;
+  max-width: 360px;
+  background: linear-gradient(180deg,#0f1a2e,#0c1424);
+  border-radius: 16px;
+  padding: 18px;
+  color: white;
 }
 
 .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 17px;
-    font-weight: 500;
-    margin-bottom: 12px;
+  font-size: 18px;
+  margin-bottom: 14px;
 }
 
 .close {
-    font-size: 20px;
-    cursor: pointer;
-}
-
-.qr-box {
-    background: white;
-    padding: 18px;
-    border-radius: 6px;
-    display: flex;
-    justify-content: center;
-}
-
-.qr-text {
-    text-align: center;
-    font-size: 12.5px;
-    margin-top: 8px;
-    color: #b8c0ff;
-    word-break: break-word;
+  cursor: pointer;
+  font-size: 20px;
 }
 
 input {
-    width: 100%;
-    padding: 11px;
-    border-radius: 6px;
-    border: none;
-    font-size: 14px;
-    margin-bottom: 10px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  margin-bottom: 12px;
 }
 
 button {
-    width: 100%;
-    padding: 11px;
-    border-radius: 6px;
-    border: none;
-    font-size: 14px;
-    cursor: pointer;
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
 }
 
-.primary { background: #2f6bff; color: white; }
-.secondary { background: #2a2f45; color: #dcdcff; margin-top: 8px; }
-.danger { background: #ff5c5c; color: white; margin-top: 8px; }
+.primary {
+  background: #3a6cff;
+  color: white;
+}
 
-.center-text {
-    text-align: center;
-    font-size: 14px;
-    margin: 10px 0;
+.secondary {
+  background: #2a2f45;
+  color: white;
+}
+
+.tirnery {
+  background: #5c4bde;
+  color: white;
+}
+
+.danger {
+  background: #ff5c5c;
+  color: white;
+}
+
+.divider {
+  text-align: center;
+  color: #7f89c9;
+  font-size: 13px;
+  margin: 10px 0;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.row button {
+  flex: 1;
+}
+
+.center {
+  text-align: center;
+}
+
+.qr-box {
+  background: white;
+  padding: 16px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.qr-text {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #b8c0ff;
 }
 </style>
 </head>
@@ -106,183 +133,179 @@ button {
 <body>
 
 <div class="overlay">
-    <div class="modal" id="app"></div>
+  <div class="modal" id="app"></div>
 </div>
 
-<!-- hidden container for image QR decoding -->
-<div id="img-reader" style="display:none;"></div>
+<canvas id="canvas" hidden></canvas>
 
 <script>
 const app = document.getElementById("app");
 let cameraScanner = null;
+let pendingStudent = null;
 
-/* ---------- UTIL ---------- */
 function today() {
-    return new Date().toISOString().split("T")[0];
-}
-
-/* ---------- QR DISPLAY ---------- */
-function showQR(studentNo) {
-    stopScanner();
-
-    app.innerHTML = `
-        <div class="header">
-            <span>QRCode</span>
-            <span class="close" onclick="showClearConfirm()">✕</span>
-        </div>
-
-        <div class="qr-box">
-            <div id="qrcode"></div>
-        </div>
-
-        <div class="qr-text">${studentNo}/${today()}/student</div>
-    `;
-
-    new QRCode(document.getElementById("qrcode"), {
-        text: `${studentNo}/${today()}/student`,
-        width: 210,
-        height: 210,
-        correctLevel: QRCode.CorrectLevel.H
-    });
-}
-
-/* ---------- REGISTER PAGE ---------- */
-function showRegister() {
-    stopScanner();
-
-    app.innerHTML = `
-        <div class="header">
-            <span>Register Student</span>
-        </div>
-
-        <input type="number" id="studentInput" placeholder="Enter student number">
-        <button class="primary" onclick="registerManual()">Register</button>
-        <button class="secondary" onclick="openScanner()">Register with QR</button>
-    `;
-}
-
-/* ---------- CAMERA SCANNER ---------- */
-function openScanner() {
-    app.innerHTML = `
-        <div class="header">
-            <span>Scan QR</span>
-            <span class="close" onclick="showRegister()">✕</span>
-        </div>
-
-        <div id="reader" style="width:100%;"></div>
-
-        <div class="center-text">OR</div>
-
-        <input type="file" accept="image/*" onchange="scanImage(event)">
-    `;
-
-    cameraScanner = new Html5Qrcode("reader");
-
-    Html5Qrcode.getCameras().then(cameras => {
-        if (!cameras.length) {
-            alert("No camera found");
-            return;
-        }
-
-        const backCam = cameras.find(c =>
-            c.label.toLowerCase().includes("back")
-        ) || cameras[0];
-
-        cameraScanner.start(
-            backCam.id,
-            { fps: 10, qrbox: 220 },
-            onScanSuccess,
-            () => {}
-        );
-    }).catch(err => {
-        alert("Camera permission denied");
-        console.error(err);
-    });
-}
-
-/* ---------- IMAGE SCAN (FIXED) ---------- */
-function scanImage(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    stopScanner();
-
-    const imgScanner = new Html5Qrcode("img-reader");
-
-    imgScanner.scanFile(file, false)
-        .then(text => {
-            imgScanner.clear();
-            onScanSuccess(text);
-        })
-        .catch(err => {
-            imgScanner.clear();
-            alert("Invalid QR image");
-            console.error(err);
-        });
-}
-
-/* ---------- QR RESULT ---------- */
-function onScanSuccess(decodedText) {
-    stopScanner();
-
-    const studentNo = decodedText.split("/")[0];
-    if (!studentNo) {
-        alert("Invalid QR format");
-        return;
-    }
-
-    localStorage.setItem("studentNumber", studentNo);
-    showQR(studentNo);
-}
-
-/* ---------- CLEAR CONFIRM ---------- */
-function showClearConfirm() {
-    stopScanner();
-
-    app.innerHTML = `
-        <div class="header">
-            <span>Clear Data</span>
-        </div>
-
-        <div class="center-text">Clear saved student data?</div>
-
-        <button class="danger" onclick="clearStorage()">Yes, Clear</button>
-        <button class="secondary" onclick="goBack()">Cancel</button>
-    `;
-}
-
-/* ---------- ACTIONS ---------- */
-function registerManual() {
-    const val = document.getElementById("studentInput").value.trim();
-    if (!val) {
-        alert("Enter student number");
-        return;
-    }
-    localStorage.setItem("studentNumber", val);
-    showQR(val);
-}
-
-function clearStorage() {
-    localStorage.removeItem("studentNumber");
-    showRegister();
-}
-
-function goBack() {
-    const s = localStorage.getItem("studentNumber");
-    if (s) showQR(s);
-}
-
-function stopScanner() {
-    if (cameraScanner) {
-        cameraScanner.stop().catch(() => {});
-        cameraScanner.clear();
-        cameraScanner = null;
-    }
+  return new Date().toISOString().split("T")[0];
 }
 
 /* ---------- INIT ---------- */
 const saved = localStorage.getItem("studentNumber");
 saved ? showQR(saved) : showRegister();
+
+/* ---------- REGISTER PAGE (FIXED UI) ---------- */
+function showRegister() {
+  stopCamera();
+  pendingStudent = null;
+
+  app.innerHTML = `
+    <div class="header">Register</div>
+
+    <input id="manualInput" placeholder="Enter student number">
+
+    <div class="divider">OR</div>
+
+    <div class="row">
+      <button class="primary" onclick="openCamera()">Scan QR</button>
+      <button class="secondary" onclick="openFile()">Choose File</button>
+    </div>
+
+    <button class="tirnery" onclick="manualPreview()">Preview</button>
+  `;
+}
+
+/* ---------- PREVIEW ---------- */
+function showPreview(studentNo) {
+  pendingStudent = studentNo;
+
+  app.innerHTML = `
+    <div class="header">
+      Confirm
+      <span class="close" style="float:right" onclick="showRegister()">✕</span>
+    </div>
+
+    <div class="center">
+      Student Number<br><b>${studentNo}</b>
+    </div>
+
+    <div style="margin-top:16px">
+      <button class="primary" onclick="register()">Register</button>
+      <button class="secondary" style="margin-top:8px" onclick="showRegister()">Cancel</button>
+    </div>
+  `;
+}
+
+/* ---------- REGISTER ---------- */
+function register() {
+  localStorage.setItem("studentNumber", pendingStudent);
+  showQR(pendingStudent);
+}
+
+/* ---------- QR DISPLAY ---------- */
+function showQR(studentNo) {
+  stopCamera();
+
+  app.innerHTML = `
+    <div class="header">
+      QRCode
+      <span class="close" style="float:right" onclick="confirmUnregister()">✕</span>
+    </div>
+
+    <div class="qr-box"><div id="qrcode"></div></div>
+    <div class="qr-text">${studentNo}/${today()}/student</div>
+  `;
+
+  new QRCode(document.getElementById("qrcode"), {
+    text: `${studentNo}/${today()}/student`,
+    width: 200,
+    height: 200
+  });
+}
+
+/* ---------- UNREGISTER ---------- */
+function confirmUnregister() {
+  app.innerHTML = `
+    <div class="header">Unregister</div>
+
+    <div class="center">Do you want to unregister your QR?</div>
+
+    <div style="margin-top:16px">
+      <button class="danger" onclick="unregister()">Unregister</button>
+      <button class="secondary" style="margin-top:8px"
+        onclick="showQR(localStorage.getItem('studentNumber'))">Cancel</button>
+    </div>
+  `;
+}
+
+function unregister() {
+  localStorage.removeItem("studentNumber");
+  showRegister();
+}
+
+/* ---------- CAMERA ---------- */
+function openCamera() {
+  stopCamera();
+
+  app.innerHTML = `
+    <div class="header">
+      Scan QR
+      <span class="close" style="float:right" onclick="showRegister()">✕</span>
+    </div>
+    <div id="reader"></div>
+  `;
+
+  cameraScanner = new Html5Qrcode("reader");
+  Html5Qrcode.getCameras().then(cams => {
+    cameraScanner.start(
+      cams[0].id,
+      { fps: 10, qrbox: 220 },
+      txt => {
+        stopCamera();
+        showPreview(txt.split("/")[0]);
+      }
+    );
+  }).catch(() => alert("Camera permission denied"));
+}
+
+/* ---------- FILE ---------- */
+function openFile() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = () => scanImage(input.files[0]);
+  input.click();
+}
+
+function scanImage(file) {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const qr = jsQR(data.data, canvas.width, canvas.height);
+
+    if (!qr) return alert("QR not detected");
+    showPreview(qr.data.split("/")[0]);
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+/* ---------- MANUAL ---------- */
+function manualPreview() {
+  const v = document.getElementById("manualInput").value.trim();
+  if (!v) return alert("Enter student number");
+  showPreview(v);
+}
+
+/* ---------- CLEANUP ---------- */
+function stopCamera() {
+  if (cameraScanner) {
+    cameraScanner.stop().catch(()=>{});
+    cameraScanner = null;
+  }
+}
 </script>
 
 </body>
