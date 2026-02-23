@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student QR</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<style>
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    background: #0b1220;
+    font-family: -apple-system, BlinkMacSystemFont, system-ui;
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8,12,28,0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal {
+    width: 92%;
+    max-width: 360px;
+    background: #0e1626;
+    border-radius: 12px;
+    padding: 14px;
+    color: white;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 17px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.close {
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.qr-box {
+    background: white;
+    padding: 18px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: center;
+}
+
+.qr-text {
+    text-align: center;
+    font-size: 12.5px;
+    margin-top: 8px;
+    color: #b8c0ff;
+    word-break: break-word;
+}
+
+input[type="number"],
+input[type="file"] {
+    width: 100%;
+    padding: 11px;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+button {
+    width: 100%;
+    padding: 11px;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.primary { background: #2f6bff; color: white; }
+.secondary { background: #2a2f45; color: #dcdcff; margin-top: 8px; }
+.danger { background: #ff5c5c; color: white; margin-top: 8px; }
+
+.center-text {
+    text-align: center;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="overlay">
+    <div class="modal" id="app"></div>
+</div>
+
+<script>
+const app = document.getElementById("app");
+let html5Qr = null;
+
+function todayDate() {
+    return new Date().toISOString().split("T")[0];
+}
+
+/* ---------- QR DISPLAY ---------- */
+function showQR(studentNo) {
+    app.innerHTML = `
+        <div class="header">
+            <span>QRCode</span>
+            <span class="close" onclick="showClearConfirm()">✕</span>
+        </div>
+
+        <div class="qr-box">
+            <div id="qrcode"></div>
+        </div>
+
+        <div class="qr-text">
+            ${studentNo}/${todayDate()}/student
+        </div>
+    `;
+
+    new QRCode(document.getElementById("qrcode"), {
+        text: `${studentNo}/${todayDate()}/student`,
+        width: 210,
+        height: 210,
+        correctLevel: QRCode.CorrectLevel.H
+    });
+}
+
+/* ---------- REGISTER ---------- */
+function showRegister() {
+    stopScanner();
+    app.innerHTML = `
+        <div class="header">
+            <span>Register Student</span>
+        </div>
+
+        <input type="number" id="studentInput" placeholder="Enter student number">
+        <button class="primary" onclick="registerStudent()">Register</button>
+        <button class="secondary" onclick="openScanner()">Register with QR</button>
+    `;
+}
+
+/* ---------- SCANNER (FIXED) ---------- */
+function openScanner() {
+    app.innerHTML = `
+        <div class="header">
+            <span>Scan QR</span>
+            <span class="close" onclick="showRegister()">✕</span>
+        </div>
+
+        <div id="reader" style="width:100%;"></div>
+
+        <div class="center-text">OR</div>
+
+        <input type="file" accept="image/*" onchange="scanImage(event)">
+    `;
+
+    html5Qr = new Html5Qrcode("reader");
+
+    Html5Qrcode.getCameras()
+        .then(cameras => {
+            if (!cameras.length) {
+                alert("No camera found");
+                return;
+            }
+
+            // Prefer back camera
+            const cameraId = cameras.find(c => c.label.toLowerCase().includes("back"))?.id
+                || cameras[0].id;
+
+            html5Qr.start(
+                cameraId,
+                { fps: 10, qrbox: 220 },
+                onScanSuccess,
+                () => {} // ignore scan errors
+            );
+        })
+        .catch(err => {
+            alert("Camera permission denied or not supported");
+            console.error(err);
+        });
+}
+
+/* ---------- IMAGE SCAN ---------- */
+function scanImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const imgScanner = new Html5Qrcode("reader");
+    imgScanner.scanFile(file, true)
+        .then(onScanSuccess)
+        .catch(() => alert("Invalid QR image"));
+}
+
+/* ---------- QR RESULT ---------- */
+function onScanSuccess(decodedText) {
+    stopScanner();
+
+    const studentNo = decodedText.split("/")[0];
+    if (!studentNo) {
+        alert("Invalid QR format");
+        return;
+    }
+
+    localStorage.setItem("studentNumber", studentNo);
+    showQR(studentNo);
+}
+
+/* ---------- CLEAR CONFIRM ---------- */
+function showClearConfirm() {
+    stopScanner();
+    app.innerHTML = `
+        <div class="header">
+            <span>Clear Data</span>
+        </div>
+
+        <div class="center-text">Clear saved student data?</div>
+
+        <button class="danger" onclick="clearStorage()">Yes, Clear</button>
+        <button class="secondary" onclick="goBack()">Cancel</button>
+    `;
+}
+
+/* ---------- ACTIONS ---------- */
+function registerStudent() {
+    const val = document.getElementById("studentInput").value.trim();
+    if (!val) return alert("Enter student number");
+
+    localStorage.setItem("studentNumber", val);
+    showQR(val);
+}
+
+function clearStorage() {
+    localStorage.removeItem("studentNumber");
+    showRegister();
+}
+
+function goBack() {
+    const studentNo = localStorage.getItem("studentNumber");
+    if (studentNo) showQR(studentNo);
+}
+
+function stopScanner() {
+    if (html5Qr) {
+        html5Qr.stop().catch(() => {});
+        html5Qr.clear();
+        html5Qr = null;
+    }
+}
+
+/* ---------- INIT ---------- */
+const savedStudent = localStorage.getItem("studentNumber");
+savedStudent ? showQR(savedStudent) : showRegister();
+</script>
+
+</body>
+</html>
