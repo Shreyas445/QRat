@@ -2,6 +2,8 @@
 
 A simple, fast, and automated web tool designed to generate daily attendance QR codes for Pyspiders classes. Instead of searching for your QR everyday in low network, this tool automates the date formatting and saves your details locally for instant access.
 
+Direct Access ----> https://shreyas445.github.io/QRat/
+
 ## ✨ Features
 
 * **Daily Automation:** Automatically grabs today's date and formats the QR data exactly as required (`StudentID/YYYY-MM-DD/student`).
