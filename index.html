@@ -54,8 +54,7 @@ button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-siz
 const app = document.getElementById("app");
 let cameraScanner = null;
 let pendingStudent = null;
-let availableCameras = [];
-let currentCameraIndex = 0;
+let useFrontCamera = false; // Start with back camera by default
 
 function today() {
   return new Date().toISOString().split("T")[0];
@@ -168,50 +167,49 @@ function showQR(studentNo) {
 
 function backToMain() { getStudents().length > 0 ? showCollection() : showRegister(); }
 
-/* ---------- CAMERA LOGIC ---------- */
+/* ---------- RELIABLE CAMERA LOGIC ---------- */
 function openCamera() {
   stopCamera();
   app.innerHTML = `
     <div class="header">Scan QR<span class="close" style="float:right" onclick="showRegister()">✕</span></div>
     <div id="reader"></div>
-    <div id="cameraControls" style="margin-top: 12px; display: none;">
+    <div style="margin-top: 12px;">
       <button class="secondary" onclick="switchCamera()">Switch Camera</button>
     </div>
   `;
   
   cameraScanner = new Html5Qrcode("reader");
-  
-  Html5Qrcode.getCameras().then(cams => {
-    if (cams && cams.length > 0) {
-      availableCameras = cams;
-      // Show switch button only if there is more than 1 camera
-      if (cams.length > 1) {
-        document.getElementById("cameraControls").style.display = "block";
-      }
-      startScanner(availableCameras[currentCameraIndex].id);
-    } else {
-      alert("No cameras found.");
-    }
-  }).catch(() => alert("Camera permission denied."));
+  startScanner();
 }
 
-function startScanner(cameraId) {
+function startScanner() {
+  // Use "environment" for back camera, "user" for front camera
+  const mode = useFrontCamera ? "user" : "environment";
+  
   cameraScanner.start(
-    cameraId, 
+    { facingMode: mode }, 
     { fps: 10, qrbox: 220 }, 
     txt => { 
       stopCamera(); 
       showPreview(txt.split("/")[0]); 
     }
-  ).catch(err => console.error("Error starting camera:", err));
+  ).catch(err => {
+    console.error("Camera start error:", err);
+    // If a laptop or phone without a back camera fails, try to fall back to the front one automatically
+    if (!useFrontCamera) {
+      useFrontCamera = true;
+      startScanner();
+    } else {
+      alert("Camera could not be started. Check permissions.");
+    }
+  });
 }
 
 function switchCamera() {
-  if (availableCameras.length > 1 && cameraScanner) {
-    // Stop the current camera before starting the next one
+  if (cameraScanner) {
+    useFrontCamera = !useFrontCamera; // Toggle state
     cameraScanner.stop().then(() => {
-      currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-      startScanner(availableCameras[currentCameraIndex].id);
+      startScanner(); // Restart with new state
     }).catch(err => console.error("Error stopping camera:", err));
   }
 }
