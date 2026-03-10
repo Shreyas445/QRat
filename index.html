@@ -54,7 +54,6 @@ button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-siz
 const app = document.getElementById("app");
 let cameraScanner = null;
 let pendingStudent = null;
-let useFrontCamera = false; // Start with back camera by default
 
 function today() {
   return new Date().toISOString().split("T")[0];
@@ -83,7 +82,7 @@ function showRegister() {
     <input type="text" id="manualInput" placeholder="Enter student number">
     <div class="divider">OR</div>
     <div class="row">
-      <button class="primary" onclick="openCamera()">Scan QR</button>
+      <button class="primary" onclick="selectCamera()">Scan QR</button>
       <button class="secondary" onclick="openFile()">Choose File</button>
     </div>
     <button class="tirnery" onclick="manualPreview()">Preview</button>
@@ -167,24 +166,27 @@ function showQR(studentNo) {
 
 function backToMain() { getStudents().length > 0 ? showCollection() : showRegister(); }
 
-/* ---------- RELIABLE CAMERA LOGIC ---------- */
-function openCamera() {
+/* ---------- CAMERA SELECTION & LAUNCH ---------- */
+function selectCamera() {
   stopCamera();
+  app.innerHTML = `
+    <div class="header">Select Camera<span class="close" style="float:right" onclick="showRegister()">✕</span></div>
+    <div class="row">
+      <button class="primary" onclick="startScanner(true)">Front</button>
+      <button class="primary" onclick="startScanner(false)">Rear</button>
+    </div>
+    <button class="secondary" style="margin-top:8px" onclick="showRegister()">Cancel</button>
+  `;
+}
+
+function startScanner(isFront) {
   app.innerHTML = `
     <div class="header">Scan QR<span class="close" style="float:right" onclick="showRegister()">✕</span></div>
     <div id="reader"></div>
-    <div style="margin-top: 12px;">
-      <button class="secondary" onclick="switchCamera()">Switch Camera</button>
-    </div>
   `;
   
   cameraScanner = new Html5Qrcode("reader");
-  startScanner();
-}
-
-function startScanner() {
-  // Use "environment" for back camera, "user" for front camera
-  const mode = useFrontCamera ? "user" : "environment";
+  const mode = isFront ? "user" : "environment";
   
   cameraScanner.start(
     { facingMode: mode }, 
@@ -195,23 +197,9 @@ function startScanner() {
     }
   ).catch(err => {
     console.error("Camera start error:", err);
-    // If a laptop or phone without a back camera fails, try to fall back to the front one automatically
-    if (!useFrontCamera) {
-      useFrontCamera = true;
-      startScanner();
-    } else {
-      alert("Camera could not be started. Check permissions.");
-    }
+    alert("Camera could not be started. Please check browser permissions.");
+    showRegister();
   });
-}
-
-function switchCamera() {
-  if (cameraScanner) {
-    useFrontCamera = !useFrontCamera; // Toggle state
-    cameraScanner.stop().then(() => {
-      startScanner(); // Restart with new state
-    }).catch(err => console.error("Error stopping camera:", err));
-  }
 }
 
 function stopCamera() {
