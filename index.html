@@ -39,10 +39,32 @@ button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-siz
 .list-name { font-weight: bold; font-size: 15px; }
 .list-id { font-size: 12px; color: #b8c0ff; margin-top: 4px; }
 .scroll-box { max-height: 280px; overflow-y: auto; }
+
+/* Custom Install Banner Styles */
+#installBanner {
+  display: none; /* Hidden by default */
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #28a745;
+  color: white;
+  padding: 14px 24px;
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: bold;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.5);
+  z-index: 9999;
+  border: none;
+  cursor: pointer;
+  width: max-content;
+}
 </style>
 </head>
 
 <body>
+
+<button id="installBanner">📲 Install App to Phone</button>
 
 <div class="overlay">
   <div class="modal" id="app"></div>
@@ -236,7 +258,38 @@ function manualPreview() {
   showPreview(v);
 }
 
-// REGISTER SERVICE WORKER FOR OFFLINE USE
+// ==========================================
+// PWA INSTALLATION LOGIC
+// ==========================================
+let deferredPrompt;
+const installBtn = document.getElementById('installBanner');
+
+// 1. Catch the browser's hidden install prompt
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); // Stop Chrome from showing its mini-infobar
+  deferredPrompt = e; // Save the event so we can trigger it later
+  installBtn.style.display = 'block'; // Show our big green button
+});
+
+// 2. When the user clicks our green button, trigger the actual install
+installBtn.addEventListener('click', async () => {
+  installBtn.style.display = 'none'; // Hide button
+  if (deferredPrompt) {
+    deferredPrompt.prompt(); // Show the native install popup
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    deferredPrompt = null; // Clear it out
+  }
+});
+
+// 3. If successfully installed, make sure the button never shows up again
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  installBtn.style.display = 'none';
+  console.log('App was installed successfully!');
+});
+
+// 4. Register Service Worker for Offline Use
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
