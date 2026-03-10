@@ -40,9 +40,9 @@ button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-siz
 .list-id { font-size: 12px; color: #b8c0ff; margin-top: 4px; }
 .scroll-box { max-height: 280px; overflow-y: auto; }
 
-/* Custom Install Banner Styles */
+/* Always-Visible Install Banner */
 #installBanner {
-  display: none; /* Hidden by default */
+  display: none; /* Handled by JS below */
   position: fixed;
   bottom: 24px;
   left: 50%;
@@ -188,11 +188,12 @@ function showQR(studentNo) {
 
 function backToMain() { getStudents().length > 0 ? showCollection() : showRegister(); }
 
-/* ---------- CAMERA SELECTION & LAUNCH ---------- */
+/* ---------- EXPLICIT CAMERA SELECTION ---------- */
 function selectCamera() {
-  stopCamera();
+  stopCamera(); // Stop any background stream just in case
   app.innerHTML = `
     <div class="header">Select Camera<span class="close" style="float:right" onclick="showRegister()">✕</span></div>
+    <div class="center" style="margin-bottom: 16px;">Which camera would you like to use?</div>
     <div class="row">
       <button class="primary" onclick="startScanner(true)">Front</button>
       <button class="primary" onclick="startScanner(false)">Rear</button>
@@ -202,16 +203,18 @@ function selectCamera() {
 }
 
 function startScanner(isFront) {
+  // Only now do we initialize the camera reader UI and request access
   app.innerHTML = `
     <div class="header">Scan QR<span class="close" style="float:right" onclick="showRegister()">✕</span></div>
     <div id="reader"></div>
+    <button class="secondary" style="margin-top: 12px;" onclick="showRegister()">Cancel Scan</button>
   `;
   
   cameraScanner = new Html5Qrcode("reader");
-  const mode = isFront ? "user" : "environment";
+  const cameraConfig = isFront ? { facingMode: "user" } : { facingMode: "environment" };
   
   cameraScanner.start(
-    { facingMode: mode }, 
+    cameraConfig, 
     { fps: 10, qrbox: 220 }, 
     txt => { 
       stopCamera(); 
@@ -219,7 +222,7 @@ function startScanner(isFront) {
     }
   ).catch(err => {
     console.error("Camera start error:", err);
-    alert("Camera could not be started. Please check browser permissions.");
+    alert("Camera access was denied or failed. Please check your browser permissions.");
     showRegister();
   });
 }
@@ -259,41 +262,45 @@ function manualPreview() {
 }
 
 // ==========================================
-// PWA INSTALLATION LOGIC
+// BULLETPROOF PWA INSTALLATION LOGIC
 // ==========================================
-let deferredPrompt;
 const installBtn = document.getElementById('installBanner');
 
-// 1. Catch the browser's hidden install prompt
+// Only show the install button if the user is in the browser (not already in the installed app)
+if (!window.matchMedia('(display-mode: standalone)').matches && !window.navigator.standalone) {
+  installBtn.style.display = 'block';
+}
+
+let deferredPrompt;
+
+// This triggers if all GitHub files (manifest, sw.js, icons) are perfect
 window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault(); // Stop Chrome from showing its mini-infobar
-  deferredPrompt = e; // Save the event so we can trigger it later
-  installBtn.style.display = 'block'; // Show our big green button
+  e.preventDefault(); 
+  deferredPrompt = e; 
 });
 
-// 2. When the user clicks our green button, trigger the actual install
 installBtn.addEventListener('click', async () => {
-  installBtn.style.display = 'none'; // Hide button
   if (deferredPrompt) {
-    deferredPrompt.prompt(); // Show the native install popup
+    // Show the native Chrome popup
+    deferredPrompt.prompt(); 
     const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to the install prompt: ${outcome}`);
-    deferredPrompt = null; // Clear it out
+    if (outcome === 'accepted') deferredPrompt = null;
+  } else {
+    // Fallback if Chrome is blocking the popup or GitHub files are incomplete
+    alert("To install manually:\\n1. Tap the 3-dot menu in your browser (Top Right).\\n2. Select 'Add to Home screen' or 'Install app'.");
   }
 });
 
-// 3. If successfully installed, make sure the button never shows up again
+// Hide button immediately once installed
 window.addEventListener('appinstalled', () => {
-  deferredPrompt = null;
   installBtn.style.display = 'none';
-  console.log('App was installed successfully!');
+  deferredPrompt = null;
 });
 
-// 4. Register Service Worker for Offline Use
+// Service Worker for Offline Mode
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
-      .then(reg => console.log('Service Worker Registered!', reg))
       .catch(err => console.error('Service Worker Registration Failed', err));
   });
 }
