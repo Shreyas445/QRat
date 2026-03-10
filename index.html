@@ -54,6 +54,8 @@ button { width: 100%; padding: 12px; border-radius: 10px; border: none; font-siz
 const app = document.getElementById("app");
 let cameraScanner = null;
 let pendingStudent = null;
+let availableCameras = [];
+let currentCameraIndex = 0;
 
 function today() {
   return new Date().toISOString().split("T")[0];
@@ -166,15 +168,62 @@ function showQR(studentNo) {
 
 function backToMain() { getStudents().length > 0 ? showCollection() : showRegister(); }
 
+/* ---------- CAMERA LOGIC ---------- */
 function openCamera() {
   stopCamera();
-  app.innerHTML = `<div class="header">Scan QR<span class="close" style="float:right" onclick="showRegister()">✕</span></div><div id="reader"></div>`;
+  app.innerHTML = `
+    <div class="header">Scan QR<span class="close" style="float:right" onclick="showRegister()">✕</span></div>
+    <div id="reader"></div>
+    <div id="cameraControls" style="margin-top: 12px; display: none;">
+      <button class="secondary" onclick="switchCamera()">Switch Camera</button>
+    </div>
+  `;
+  
   cameraScanner = new Html5Qrcode("reader");
+  
   Html5Qrcode.getCameras().then(cams => {
-    cameraScanner.start(cams[0].id, { fps: 10, qrbox: 220 }, txt => { stopCamera(); showPreview(txt.split("/")[0]); });
+    if (cams && cams.length > 0) {
+      availableCameras = cams;
+      // Show switch button only if there is more than 1 camera
+      if (cams.length > 1) {
+        document.getElementById("cameraControls").style.display = "block";
+      }
+      startScanner(availableCameras[currentCameraIndex].id);
+    } else {
+      alert("No cameras found.");
+    }
   }).catch(() => alert("Camera permission denied."));
 }
 
+function startScanner(cameraId) {
+  cameraScanner.start(
+    cameraId, 
+    { fps: 10, qrbox: 220 }, 
+    txt => { 
+      stopCamera(); 
+      showPreview(txt.split("/")[0]); 
+    }
+  ).catch(err => console.error("Error starting camera:", err));
+}
+
+function switchCamera() {
+  if (availableCameras.length > 1 && cameraScanner) {
+    // Stop the current camera before starting the next one
+    cameraScanner.stop().then(() => {
+      currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+      startScanner(availableCameras[currentCameraIndex].id);
+    }).catch(err => console.error("Error stopping camera:", err));
+  }
+}
+
+function stopCamera() {
+  if (cameraScanner) { 
+    cameraScanner.stop().catch(()=>{}); 
+    cameraScanner = null; 
+  }
+}
+
+/* ---------- FILE LOGIC ---------- */
 function openFile() {
   const input = document.createElement("input");
   input.type = "file"; input.accept = "image/*";
@@ -199,10 +248,6 @@ function manualPreview() {
   const v = document.getElementById("manualInput").value.trim();
   if (!v) return alert("Enter student number");
   showPreview(v);
-}
-
-function stopCamera() {
-  if (cameraScanner) { cameraScanner.stop().catch(()=>{}); cameraScanner = null; }
 }
 
 // REGISTER SERVICE WORKER FOR OFFLINE USE
