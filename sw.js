@@ -1,10 +1,11 @@
-const CACHE_NAME = 'pyspiders-qr-v1';
+const CACHE_NAME = 'qrat-v2';
 
-// We cache your local files AND the external library links
+// Removed './' to prevent GitHub Pages 404 errors, and added your icons
 const ASSETS_TO_CACHE = [
-  './',
   './index.html',
   './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
@@ -22,7 +23,6 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(response => {
-      // Return the cached file if we have it, otherwise fetch from the internet
       return response || fetch(event.request);
     })
   );
