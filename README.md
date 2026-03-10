@@ -6,6 +6,9 @@ A simple, fast, and automated web tool designed to generate daily attendance QR 
 </br>
 
 >    Direct Access ---->   https://shreyas445.github.io/QRat/
+</br>
+
+>    Alternate Link  ---->   https://qspy.netlify.app/ 
 
 </br>
 
